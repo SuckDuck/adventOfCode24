@@ -1,0 +1,1 @@
+Ok, I wasn’t planning on commenting on this right now, but I just want to point out something to my future disappointed self. When I finished this, I was really tired and didn’t want to spend more time on it. I’ve been really slow with the challenge so far, and that is quite disappointing, but at least I’m sure I can do this one better. I leave it in your hands. ;)
