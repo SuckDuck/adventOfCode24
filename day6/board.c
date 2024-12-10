@@ -3,32 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#define ORIENTATION_CHARS "^>v<"
-
-typedef int ORIENTATION_t;
-enum ORIENTATION {
-    ORIENTATION_UP,
-    ORIENTATION_RIGHT,
-    ORIENTATION_DOWN,
-    ORIENTATION_LEFT
-};
-
-typedef struct square{
-    int x,y;
-    int activated, obstacle;
-} square;
-
-struct guard{
-    int pos_x, pos_y;
-    ORIENTATION_t orientation;
-};
-
-typedef struct board{
-    int cols, rows;
-    square* squares;
-    struct guard guard;
-} board;
+#include "board.h"
 
 square* board_get_square(board* b, int x, int y){
     if(x >= b->cols || y >= b->rows || x<0 || y<0) return NULL;
@@ -54,11 +29,15 @@ void board_set_elements(board* b, char* s, int sl){
     int col=0;
     int row=0;
     for(int i=0; i<sl; i++){
+        square* sq = board_get_square(b,col,row);
         char c = s[i];
         switch(c){
             case '#':
-            square* s = board_get_square(b,col,row);
-            s->obstacle = 1;
+            sq->obstacle = 1;
+            break;
+
+            case '.':
+            sq->obstacle = 0;
             break;
 
             case '^':
@@ -81,7 +60,8 @@ void board_print(board* b){
     for(int i=0; i<b->cols * b->rows; i++){
         square* s = b->squares+i;
         if(s->x == 0) printf("\n");
-        char c =(b->guard.pos_x == s->x && b->guard.pos_y == s->y) ? ORIENTATION_CHARS[b->guard.orientation] : ' ';
+        char c = s->value>0 ? 'X' : ' ';
+        c =(b->guard.pos_x == s->x && b->guard.pos_y == s->y) ? ORIENTATION_CHARS[b->guard.orientation] : c;
         c = s->obstacle == 1 ? '#':c;
         printf("[%c] ",c);
     }
@@ -110,12 +90,12 @@ void board_init(board* b, char* s, int sl){
     b->guard.orientation=ORIENTATION_UP;
     b->guard.pos_x = 0;
     b->guard.pos_y = 0;
+    b->guard.total_dissplacement = 0;
     board_set_elements(b,s,sl);
 }
 
 int guard_step(board *b){
-    int retries = 0;
-    for(int i=0; i<2; i++){
+    while(1){
         int nx = 0;
         int ny = 0;
         switch(b->guard.orientation){
@@ -126,17 +106,15 @@ int guard_step(board *b){
         }
 
         square* n_square = board_get_square(b,(b->guard.pos_x)+nx,(b->guard.pos_y)+ny);
-        if(n_square == NULL || n_square->obstacle == 1){
+        if(n_square == NULL) return -1;
+        if(n_square->obstacle == 1){
             b->guard.orientation++;
             if(b->guard.orientation > 3) b->guard.orientation = 0;
-            if(retries == 0){
-                retries++;
-                continue;
-            }
+            continue;
             
-            return -1;
         }
         
+        b->guard.total_dissplacement += 1;
         b->guard.pos_x = n_square->x;
         b->guard.pos_y = n_square->y;
         return 0;
@@ -157,42 +135,4 @@ int read_input_file(char* path, char** output){
 
     close(fd);
     return st.st_size;
-}
-
-int main(int argsc, char** args){
-    if(argsc != 2){
-        return 1;
-    }
-    char* input_file_path = args[1];
-
-    char* input_file;
-    int input_file_l = read_input_file(input_file_path,&input_file);
-
-    board b;
-    board_init(&b,input_file,input_file_l);
-
-    square* s = board_get_square(&b,b.guard.pos_x,b.guard.pos_y);
-    s->activated = 1;
-    while (guard_step(&b) == 0){
-        s = board_get_square(&b,b.guard.pos_x,b.guard.pos_y);
-        s->activated = 1;
-
-        int total=0;
-        for(int i=0; i<b.cols*b.rows; i++){
-            total += (b.squares+i)->activated;
-        }
-
-        sleep(1);
-        printf("%i\n",total);
-    }
-
-    /*int total=0;
-    for(int i=0; i<b.cols*b.rows; i++){
-        total += (b.squares+i)->activated;
-    }
-
-    printf("PART1 ANSWER:%i\n",total);
-    board_free(&b);*/
-    free((void*) input_file);
-    return 0;
 }
