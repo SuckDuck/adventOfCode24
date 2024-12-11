@@ -73,6 +73,7 @@ int parse_ecuations(char* s, int l, ecuation* out){
         (out+i)->is_valid = 0;
     }
 
+    free((void*) lines_p);
 }
 
 int read_input_file(char* path, char** output){
@@ -106,40 +107,6 @@ int custom_pow(int A, int B){
     return result;
 }
 
-int convert_to_pot(int n, int p){
-    int result=0;
-    for(int i=0; 1; i++){
-        int position=1;
-        for(int p=0; p<i; p++) position *= 10;
-
-        int r = n % p;
-        result += r*position;
-
-        n /= p;
-        if(n <= 0) break;
-    }
-
-    return result;
-}
-
-int get_digit(int n, int b, int p){
-    int ogn = n;
-    int og = (n>>b)&1;
-    
-    n = convert_to_pot(n,p);
-    int a=n;
-    for(int i=0;i<=b;i++) a /= 10;
-    for(int i=0;i<=b;i++) a *= 10;
-    n = n-a;
-    for(int i=0;i<b;i++) n /= 10;
-
-    if(og != n){
-        printf("%i->%i  %i  %i\n",ogn, b, og, n);
-    }
-
-    return n;
-}
-
 uint64_t concatenate(uint64_t x, uint64_t y) {
     uint64_t pow = 10;
     while(y >= pow)
@@ -147,11 +114,24 @@ uint64_t concatenate(uint64_t x, uint64_t y) {
     return x * pow + y;        
 }
 
+void next_op(int* op, int b, int call, int max_call){
+    *op+=1;
+    if(*op >= b){
+        *op=0;
+        if(call < max_call)
+            next_op(op+1, b, call+1, max_call);
+    }
+}
+
 int main(int argsc, char** args){
-    if(argsc < 2 || argsc > 3) return 1;
+    if(argsc != 3 || (strcmp("first_part",args[2]) != 0 && strcmp("second_part",args[2]) != 0)){
+        printf("usage: day7 [input file path] [ first_part | second_part ]\n");
+        return 1;
+    }
+
     char* input_file_path = args[1];
-    char* puzzle_part = argsc > 2 ? args[2] : "first";
-    int pot = strcmp("second",puzzle_part) == 0 ? 3 : 2;
+    char* puzzle_part = args[2];
+    int pot = strcmp("second_part",puzzle_part) == 0 ? 3 : 2;
 
     char* input_string;
     int input_string_l = read_input_file(input_file_path,&input_string);
@@ -163,33 +143,42 @@ int main(int argsc, char** args){
     // for each ecuation
     for(int i=0; i<ecuations_c; i++){
         ecuation* e = ecuations+i;
-        int max_count = custom_pow(pot,e->parametes_c-1);
 
-        // for each operator ( represented as binary/ternary )
-        for(int c=0; c<max_count; c++){
+        int op_c = e->parametes_c-1;
+        int op[op_c];
+        for(int o=0; o<op_c; o++) op[o]=0;
+
+        
+        // for each possibility
+        int possibilities=custom_pow(pot,op_c);
+        for(int p=0; p<possibilities; p++){
+            next_op(op,pot,0,op_c-1);
             uint64_t result = e->parameters[0];
-            for(int b=0; b<e->parametes_c-1; b++){
-                int operator = get_digit(c,b,pot);
+
+            // for each operator
+            for(int b=0; b<op_c; b++){
+                int operator = op[b];
                 if(operator == ADD) result += e->parameters[b+1];
                 if(operator == MUL) result *= e->parameters[b+1];
-                //if(operator == CAT) result = concatenate(result,e->parameters[b+1]);
+                if(operator == CAT) result = concatenate(result,e->parameters[b+1]);
 
             }
             
             if(result == e->result) e->is_valid = 1;
         }
+
+        free((void*) e->parameters);
     }
+
 
     uint64_t calibration_value = 0;
     for(int i=0; i<ecuations_c; i++){
         ecuation* e = ecuations+i;
-        if(e->is_valid){        
-            calibration_value += e->result;
-            //ecuation_print(ecuations+i);
-        }
+        if(e->is_valid) calibration_value += e->result;
     }
 
     printf("CALIBRATION VALUE = %lld\n",calibration_value);
     free((void*) input_string);
+    free((void*) ecuations);
     return 0;
 }
