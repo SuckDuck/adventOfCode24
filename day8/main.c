@@ -161,5 +161,6 @@ int main(int argsc, char** args){
     printf("ANSWER = %i\n",result);
 
     free(m.spots);
+    free(input_string);
     return 0;
 }
