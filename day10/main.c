@@ -3,12 +3,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <string.h>
 
 typedef struct spot{
     int x,y;
-    char anthenna_type;
-    int antinode;
+    int height;
+    int counted;
 } spot;
 
 typedef struct map{
@@ -16,6 +15,22 @@ typedef struct map{
     int spots_c;
     spot* spots;
 } map;
+
+int char_to_int(char c){
+    switch(c){
+        case '0': return 0;
+        case '1': return 1;
+        case '2': return 2;
+        case '3': return 3;
+        case '4': return 4;
+        case '5': return 5;
+        case '6': return 6;
+        case '7': return 7;
+        case '8': return 8;
+        case '9': return 9;
+        default:  return -1;
+    }
+}
 
 spot* map_get_spot(map* m, int x, int y){
     if(x >= m->cols || y >= m->rows || x<0 || y<0) return NULL;
@@ -54,8 +69,6 @@ void map_init(map* m, char* s, int s_l){
             y++;
         }
 
-        s->anthenna_type = '.';
-        s->antinode = 0;
     }
 
     // set the anthenas location
@@ -63,10 +76,17 @@ void map_init(map* m, char* s, int s_l){
     for(int i=0; i<s_l; i++){
         char c = s[i];
         if(c == '\n') continue;
-        if(c != '.') (m->spots+cc)->anthenna_type = c;
+        (m->spots+cc)->height = char_to_int(c);
         cc++;
     }
 
+}
+
+void map_reset_counted(map* m){
+    for(int i=0; i<m->spots_c; i++){
+        spot* s=m->spots+i;
+        s->counted=0;
+    }
 }
 
 void map_print(map* m){
@@ -74,11 +94,7 @@ void map_print(map* m){
     for(int y=0; y<m->rows; y++){
         for(int x=0; x<m->cols; x++){
             spot* s = map_get_spot(m,x,y);
-            if(s->anthenna_type != '.')
-                printf("%c",s->anthenna_type);
-
-            else printf("%c",s->antinode > 0 ? '#': s->anthenna_type);
-            
+            printf("%i ",s->height);
         }
         printf("\n");
     }
@@ -103,64 +119,61 @@ int read_input_file(char* path, char** output){
     return st.st_size;
 }
 
-void calculate_antinodes_recursive(map* m, spot* s,int x, int y){
-    spot* sn = map_get_spot(m,(s->x) + x, (s->y) + y);
-    if(sn != NULL){
-        sn->antinode = 1;
-        calculate_antinodes_recursive(m,sn,x,y);
+void reach_to_nine(map* m,spot* s, int* score, int* rating){
+    if(s->height == 9){
+        *rating += 1;
+        if(s->counted == 0){
+            s->counted = 1;
+            *score += 1;
+        }
     }
-}
-
-int main(int argsc, char** args){
-    if(argsc != 3 || (strcmp("first_part",args[2]) != 0 && strcmp("second_part",args[2]) != 0)){
-        printf("usage: day8 [input file path] [ first_part | second_part ]\n");
-        return 1;
-    }
-    char* input_file_path = args[1];
-    int puzzle_part = strcmp("second_part",args[2]) == 0 ? 2 : 1;
-
-
-    char* input_string;
-    int input_string_l = read_input_file(input_file_path,&input_string);
-
-    map m;
-    map_init(&m,input_string,input_string_l);
     
-    //for each spot in the map - first
-    for(int i=0; i<m.spots_c; i++){
-        spot* s0 =m.spots + i;
-        if(s0->anthenna_type != '.'){
-            // for each spot in the map - second
-            for(int o=0; o<m.spots_c; o++){
-                spot* s1 =m.spots + o;
-                if(s1->anthenna_type == s0->anthenna_type && s0->x != s1->x && s0->y != s1->y){
-                    int sx = s0->x - s1->x;
-                    int sy = s0->y - s1->y;
+    int rs=0;
+    int directions[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
 
-                    if(puzzle_part == 1){
-                        spot* sn = map_get_spot(&m,(s0->x) + sx, (s0->y) + sy);
-                        if(sn != NULL) sn->antinode = 1;
-                    }
-
-                    else calculate_antinodes_recursive(&m,s0,sx,sy);
-                    
-                }
-            }
+    // for each direction
+    for(int i=0; i<4; i++){
+        spot* next_spot = map_get_spot(m,(s->x)+directions[i][0],(s->y)+directions[i][1]);
+        if(next_spot != NULL && next_spot->height == (s->height)+1){
+            reach_to_nine(m,next_spot,score,rating);
         }
     }
 
-    // for each spot in the map - again
-    int result = 0;
+}
+
+int main(int argsc, char** args){
+    if(argsc != 2){
+        printf("usage: day10 [input file path]\n");
+        return 1;
+    }
+    char* input_file_path = args[1];
+
+    char* input_str;
+    int input_len = read_input_file(input_file_path,&input_str);
+
+    map m;
+    map_init(&m,input_str,input_len);
+
+    // for each spot
+    int total_score=0;
+    int total_rating=0;
     for(int i=0; i<m.spots_c; i++){
-        spot* s =m.spots + i;
-        if(s->antinode > 0 || s->anthenna_type != '.') result++;
+        map_reset_counted(&m);
+        spot* s = m.spots+i;
+        if(s->height == 0){
+            int score=0;
+            int rating=0;
+            reach_to_nine(&m,s,&score,&rating);
+
+            total_score  += score;
+            total_rating += rating;
+        }
     }
 
-    
-    map_print(&m);
-    printf("ANSWER = %i\n",result);
+    printf("TOTAL SCORE  (part#1): %i\n",total_score);
+    printf("TOTAL RATING (part#2): %i\n",total_rating);
 
     map_free(&m);
-    free(input_string);
+    free(input_str);
     return 0;
 }
