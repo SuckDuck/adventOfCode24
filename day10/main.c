@@ -71,7 +71,7 @@ void map_init(map* m, char* s, int s_l){
 
     }
 
-    // set the anthenas location
+    // set the height per spot
     int cc=0;
     for(int i=0; i<s_l; i++){
         char c = s[i];
